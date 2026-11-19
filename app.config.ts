@@ -38,8 +38,8 @@ const config: ExpoConfig = {
     ['expo-notifications', { icon: './assets/notification-icon.png', color: '#344B3A' }],
     '@react-native-community/datetimepicker',
   ],
-  // GitHub Pages serves the site from /<repo-name>/. Keep this in sync with the repo name.
-  experiments: { typedRoutes: false, baseUrl: '/streaks' },
+  // Served from the root of streaks.mvriba.com (GitHub Pages custom domain), so no baseUrl.
+  experiments: { typedRoutes: false },
 };
 
 export default config;
