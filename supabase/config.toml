@@ -1,0 +1,5 @@
+# Minimal Supabase CLI config. `supabase link --project-ref <ref>` connects it to your project.
+project_id = "streaks"
+
+[functions.delete-account]
+verify_jwt = true
