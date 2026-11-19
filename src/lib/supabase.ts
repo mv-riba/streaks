@@ -9,7 +9,8 @@ const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 /** False when .env is missing — the app shows a setup screen instead of failing silently. */
 export const supabaseConfigured = Boolean(url && anonKey && !url.includes('YOUR-PROJECT'));
 
-export const supabase = createClient(url ?? 'https://not-configured.supabase.co', anonKey ?? 'not-configured', {
+// `||`, not `??`: CI passes an unset variable as an empty string, and createClient throws on ''.
+export const supabase = createClient(url || 'https://not-configured.supabase.co', anonKey || 'not-configured', {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
