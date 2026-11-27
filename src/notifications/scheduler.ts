@@ -109,7 +109,7 @@ export function reconcileSchedules(input: ScheduleInput): Promise<void> {
       });
     }
     // Local mapping (§10.4): streak ↔ notification id ↔ time ↔ timezone. Informational only —
-    // Supabase streak settings stay the source of truth and are re-applied on every reconcile.
+    // Server-side streak settings stay the source of truth and are re-applied on every reconcile.
     const now = await Notifications.getAllScheduledNotificationsAsync();
     const mapping = now
       .filter((r) => isCheckinPayload(r.content.data))

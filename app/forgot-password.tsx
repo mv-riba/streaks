@@ -1,8 +1,8 @@
 /**
  * Password reset with a 6-digit email code: works identically on web and Android, with no
- * deep-link setup. Requires the Supabase "Reset password" email template to include
- * {{ .Token }} (see README). Lives outside the (auth) group so verifying the code
- * (which signs the user in) does not redirect away before the new password is saved.
+ * deep-link setup. Uses Neon Auth's email OTP ("forget-password" type), sent by Neon's
+ * managed mailer; after the new password is set the user is signed in with it. Lives
+ * outside the (auth) group so signing in does not redirect away mid-flow.
  */
 import { Link, useRouter } from 'expo-router';
 import React, { useState } from 'react';

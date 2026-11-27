@@ -1,6 +1,6 @@
 # Builds the Streaks web app and publishes it to GitHub Pages on every push to main.
-# Needs two repository variables (Settings → Secrets and variables → Actions → Variables):
-#   EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY
+# Needs one repository variable (Settings → Secrets and variables → Actions → Variables):
+#   EXPO_PUBLIC_NEON_URL  (https://<endpoint>.<cell>.<region>.aws.neon.tech/<database>)
 name: Deploy web
 
 on:
@@ -37,8 +37,7 @@ jobs:
       - name: Build website
         run: npx expo export --platform web
         env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_NEON_URL: ${{ vars.EXPO_PUBLIC_NEON_URL }}
 
       # GitHub Pages has no "send every path to index.html" setting; serving the app as
       # the 404 page makes links like /streak/123 work when opened or refreshed directly.

@@ -29,13 +29,13 @@ const runtime = [
   '@react-native-async-storage/async-storage',
   '@react-native-community/datetimepicker',
   '@react-native-community/netinfo',
-  '@supabase/supabase-js',
+  '@neon/neon-js',
   'react-native-url-polyfill',
 ];
 
-const dev = ['typescript', '@types/react', 'tsx'];
+const dev = ['typescript', '@types/react', '@types/node', 'tsx'];
 
 run(`npx expo install ${runtime.join(' ')}`);
 run(`npx expo install ${dev.join(' ')} -- --save-dev`);
 run('npx expo install --check');
-console.log('\nDependencies installed. Next: copy .env.example to .env and fill in your Supabase values.');
+console.log('\nDependencies installed. Next: copy .env.example to .env and set EXPO_PUBLIC_NEON_URL.');

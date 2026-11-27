@@ -35,7 +35,7 @@ async function markHandled(id: string): Promise<void> {
 
 export interface MinimalResponse {
   actionIdentifier: string;
-  notification: { request: { identifier: string; content: { data: unknown } } };
+  notification: { request: { identifier: string; content: { data?: unknown } } };
 }
 
 export async function handleCheckinResponse(response: MinimalResponse): Promise<ResponseResult> {
