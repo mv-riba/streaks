@@ -6,7 +6,7 @@ One Expo (React Native + TypeScript) codebase gives you three things:
 - **Android app**: built with EAS when you're ready
 - **iOS app**: possible later
 
-Supabase provides the auth and the database.
+[Neon](https://neon.com) provides the database (Lakebase Postgres), auth (Neon Auth / Managed Better Auth) and the Data API the app queries through `@neon/neon-js`.
 
 ```
 app/                     Screens (Expo Router)
@@ -15,15 +15,17 @@ app/                     Screens (Expo Router)
   forgot-password.tsx
 src/
   logic/                 Pure business rules + tests (dates, streaks, notificationPlan, completionQueue)
-  data/                  Supabase API, the single completion path, app store
+  data/                  Data API calls, the single completion path, app store
   notifications/         Permissions, scheduling, action handling, background task
-  auth/                  AuthProvider
+  auth/                  AuthProvider, offline session fallback
+  lib/                   Neon client (+ native session cookie storage, polyfills)
   ui/                    Theme + reusable components
-supabase/
-  migrations/            Database schema, RLS, record_completion()
-  functions/delete-account/   Edge Function for account deletion
-  tests/                 SQL tests (constraints, RLS isolation, RPC)
-scripts/                 bootstrap (installs SDK-matched deps), test-db
+neon/
+  migrations/            0001 schema, RLS, record_completion(), delete_my_account(); 0002 one-off data import
+  tests/                 SQL tests against a local Neon stub (constraints, RLS isolation, RPCs, import)
+neon.ts                  Neon project policy (Auth + Data API), applied with `neon deploy`
+docs/                    The original Supabase migration, for reference
+scripts/                 bootstrap (installs SDK-matched deps), test-db, simulate-native-session
 ```
 
 ---
@@ -32,7 +34,7 @@ scripts/                 bootstrap (installs SDK-matched deps), test-db
 
 - **Node.js 20 or newer** (LTS). Check with `node -v`.
 - **Git**.
-- A free **Supabase** account: <https://supabase.com>
+- A free **Neon** account: <https://neon.com>, and the Neon CLI: `npm i -g neon@latest`
 - A free **Expo** account: <https://expo.dev>. This one is for web hosting and Android builds.
 - *(Android, later)* an Android phone. For Play Store release you also need a Google Play developer account, which has a one-time fee.
 
@@ -46,41 +48,29 @@ npm run bootstrap    # installs every other package at the version that matches 
 
 `bootstrap` uses `npx expo install`, so the versions always match each other. Don't hand-edit package versions.
 
-## Step 2 — Create the Supabase project
+## Step 2 — Set up Neon
 
-1. Go to supabase.com and choose **New project**. Pick a region near your users (for example Frankfurt or Stockholm) and save the database password.
-2. **Create the database.** Use either option:
-   - **Option A (easiest):** Open **SQL Editor**, then **New query**. Paste the whole of `supabase/migrations/20261119000001_init.sql` and click **Run**.
-   - **Option B (CLI):**
-     ```bash
-     npx supabase login
-     npx supabase link --project-ref YOUR-PROJECT-REF
-     npx supabase db push
-     ```
-3. **Deploy the account-deletion function.** Deleting a user needs the secret service-role key, so that step runs on Supabase's servers and never in the app.
+1. **Link the project** (creates `.neon`, pulls connection details into `.env`):
    ```bash
-   npx supabase login                                   # if not done above
-   npx supabase link --project-ref YOUR-PROJECT-REF     # if not done above
-   npx supabase functions deploy delete-account
+   neon init -y --org-id <org> --project-id <project> --branch production --services postgres
+   neon deploy          # applies neon.ts: Neon Auth + Data API (Managed Better Auth provider)
+   neon data-api get -o json   # expect "auth_provider": "neon_auth"
    ```
-4. **Turn on the password-reset code.** Go to **Authentication**, then **Emails** (Email Templates), then **Reset password**. Replace the body with something like:
-   ```html
-   <h2>Reset your Streaks password</h2>
-   <p>Your code is: <strong>{{ .Token }}</strong></p>
-   <p>Enter it in the app. It expires in 1 hour.</p>
+2. **Create the database.** Open Neon Console → **SQL Editor** (branch `production`, database `neondb`), paste the whole of `neon/migrations/0001_init.sql` and click **Run**. Then **Data API → Refresh schema cache** (or `neon data-api refresh-schema`).
+3. **Trust your web origin** so Neon Auth accepts sign-in from it and from the phone app:
+   ```bash
+   neon neon-auth domain add https://streaks.mvriba.com
    ```
-   The app uses this 6-digit code instead of a link, so password reset works the same on web and Android.
-5. **Confirm sign-up email** (Authentication, then Sign In / Providers, then Email):
-   - Leave **Confirm email** on for production.
-   - While testing you can turn it off, so new accounts log in straight away.
-   - Supabase's built-in email sender is rate-limited, so before launch add your own SMTP (Authentication, then Emails, then SMTP Settings). Resend, Postmark and Brevo all work.
-6. **Set URLs** (Authentication, then URL Configuration): set **Site URL** to your live web address once you have it (Step 5). Until then, use `http://localhost:8081`.
-7. **Copy your keys.** Under **Project Settings**, then **API**, copy the Project URL and the **anon / publishable** key:
+   `localhost` is allowed by default for development.
+4. **Emails.** Password-reset codes are sent by Neon's shared mailer (`auth@mail.myneon.app`); the app uses the 6-digit code, so reset works the same on web and Android. "Verify email at signup" is off, so new accounts sign in straight away; if you turn it on, the app tells users to confirm first. Before launch, add your own SMTP: <https://neon.com/docs/auth/production-checklist>.
+5. **Set the app's URL.** Your Neon base URL is the connection host plus database name over https:
    ```bash
    cp .env.example .env
-   # then fill in EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY
+   # EXPO_PUBLIC_NEON_URL=https://ep-xxx.c-3.eu-west-2.aws.neon.tech/neondb
    ```
-   The anon key is meant to be public; Row Level Security protects the data. **Never** put the `service_role` key in `.env` or anywhere in the app.
+   This URL is meant to be public; Row Level Security protects the data. **Never** put `DATABASE_URL` (it has the password) in an `EXPO_PUBLIC_` variable.
+
+**Account deletion** is the `delete_my_account()` database function (Neon Auth has no self-service delete): it deletes the caller's Neon Auth user, which cascades to profiles, streaks and completions.
 
 ## Step 3 — Run it locally
 
@@ -90,7 +80,7 @@ npm run web          # opens http://localhost:8081
 
 Then work through the checks:
 
-- Sign up and confirm your email.
+- Sign up.
 - Create a streak and mark it complete.
 - Open the streak and check the calendar.
 - Try editing, archiving and deleting.
@@ -99,11 +89,11 @@ Then work through the checks:
 ## Step 4 — Run the automated tests
 
 ```bash
-npm test             # 32 tests: streak maths, dates/DST/timezones, notification planning, offline queue
-npm run test:db      # 36 checks: schema, constraints, RLS isolation, record_completion (needs PostgreSQL 15+ installed)
+npm test             # streak maths, dates/DST/timezones, notification planning, offline queue, session cookie jar
+npm run test:db      # schema, constraints, RLS isolation, record_completion, delete_my_account, data import (needs PostgreSQL 15+)
 ```
 
-`test:db` creates a throwaway local Postgres, so it never touches your Supabase project. If you don't have Postgres installed, it's fine to skip it; I've already run it during the build.
+`test:db` creates a throwaway local Postgres with a stand-in for Neon's `neon_auth`/`auth` schemas, so it never touches your Neon project.
 
 ## Step 5 — Put the web app live (EAS Hosting)
 
@@ -117,7 +107,7 @@ You'll get a URL like `https://streaks--yourname.expo.app`. You can add your own
 
 After deploying:
 
-- Put that URL into Supabase as the **Site URL** (Step 2.6). Confirmation emails then link to the live app.
+- Add that URL to Neon Auth's trusted domains (Step 2.3).
 - Every later update is just `npm run deploy:web` again.
 
 *Alternatives:* `npm run export:web` creates a static `dist/` folder that you can upload to Netlify, Vercel or Cloudflare Pages. `public/_redirects` is already included, so deep links work on Netlify.
@@ -125,12 +115,12 @@ After deploying:
 ## Step 6 — Android app (when you're ready)
 
 1. In `app.config.ts`, change `com.yourname.streaks` to your own reverse-domain ID. **It can't be changed after you publish.**
-2. Give EAS your Supabase values. `.env` isn't uploaded to cloud builds, so add them there:
+2. Give EAS your Neon URL. `.env` isn't uploaded to cloud builds, so add it there:
    ```bash
-   npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_URL --value https://... --environment preview --environment production --visibility plaintext
-   npx eas-cli@latest env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value ... --environment preview --environment production --visibility plaintext
+   npx eas-cli@latest env:create --name EXPO_PUBLIC_NEON_URL --value https://ep-...neon.tech/neondb --environment development --environment preview --environment production --visibility plaintext
    ```
-   If the CLI flags differ in your version, add the same two variables on expo.dev, under your project's **Environment variables**, for both *preview* and *production*.
+   If the CLI flags differ in your version, add the variable on expo.dev, under your project's **Environment variables**.
+   The phone app keeps the Neon Auth session cookie in AsyncStorage and sends `Origin: https://streaks.mvriba.com` (override with `EXPO_PUBLIC_NEON_AUTH_ORIGIN`), which must be a trusted domain (Step 2.3).
 3. Build an installable test APK:
    ```bash
    npx eas-cli@latest build -p android --profile preview
@@ -193,9 +183,9 @@ If background **Yes, completed** doesn't record on some configuration, set `OPEN
 - **Stats are always calculated from completion records**, never stored, so history and longest streak can't drift. The rules live in `src/logic/streaks.ts` and are covered by tests.
 - **One completion path.** Manual taps, notification answers and offline sync all go through `recordCompletion()`, which then calls the `record_completion()` database function. That function checks ownership, archive state, the date window, the start date and duplicates on the server.
 - **Clients can't write the completions table directly.** RLS plus revoked grants enforce this, and the composite foreign key guarantees a completion's owner matches its streak's owner.
-- **Supabase is the source of truth** for check-in settings. The device's notification schedule is rebuilt from it on app start, on resume, after completions and on every settings change.
+- **The database is the source of truth** for check-in settings. The device's notification schedule is rebuilt from it on app start, on resume, after completions and on every settings change.
 - **Dates are calendar dates** (`YYYY-MM-DD`) in the device's timezone. Creation timestamps are stored separately in UTC.
 
 ## Free-tier note
 
-Supabase's free plan pauses a project after about a week with no activity. Restart it from the dashboard, or upgrade once you have real users.
+Neon's free plan scales compute to zero when idle; the first request after a pause takes a moment longer.

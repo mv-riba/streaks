@@ -8,3 +8,7 @@ ios/
 .env.local
 *.log
 .DS_Store
+.neon
+*export*.json
+# Generated from the private export; contains personal data. Kept local only.
+neon/migrations/0002_import_my_data.sql

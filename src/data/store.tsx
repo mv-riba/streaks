@@ -1,7 +1,7 @@
 /**
  * App state for the signed-in user: active streaks, completion history, device-only
  * pending completions and connectivity. Every mutation re-reconciles notification
- * schedules so the OS always matches Supabase (§8.8).
+ * schedules so the OS always matches the database (§8.8).
  */
 import NetInfo from '@react-native-community/netinfo';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
